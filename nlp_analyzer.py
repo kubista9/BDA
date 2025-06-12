@@ -14,7 +14,7 @@ from nltk.tokenize import word_tokenize, sent_tokenize
 from nltk.stem import WordNetLemmatizer
 from nltk.chunk import ne_chunk
 from nltk.tag import pos_tag
-import spacy
+# SpaCy removed - using NLTK only
 from textblob import TextBlob
 from collections import Counter, defaultdict
 import re
@@ -29,21 +29,50 @@ from sklearn.metrics.pairwise import cosine_similarity
 # Sentiment Analysis
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-# Download required NLTK data
+import ssl
 try:
-    nltk.data.find('tokenizers/punkt')
-    nltk.data.find('corpora/stopwords')
-    nltk.data.find('corpora/wordnet')
-    nltk.data.find('taggers/averaged_perceptron_tagger')
-    nltk.data.find('chunkers/maxent_ne_chunker')
-    nltk.data.find('corpora/words')
-except LookupError:
-    nltk.download('punkt')
-    nltk.download('stopwords')
-    nltk.download('wordnet')
-    nltk.download('averaged_perceptron_tagger')
-    nltk.download('maxent_ne_chunker')
-    nltk.download('words')
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
+
+# Download required NLTK data with error handling
+def download_nltk_data():
+    """Download NLTK data with fallback options"""
+    required_data = {
+        'tokenizers/punkt': 'punkt',
+        'corpora/stopwords': 'stopwords', 
+        'corpora/wordnet': 'wordnet',
+        'taggers/averaged_perceptron_tagger': 'averaged_perceptron_tagger',
+        'chunkers/maxent_ne_chunker': 'maxent_ne_chunker',
+        'corpora/words': 'words'
+    }
+    
+    for path, name in required_data.items():
+        try:
+            nltk.data.find(path)
+        except LookupError:
+            try:
+                print(f"Downloading {name}...")
+                nltk.download(name, quiet=True)
+            except Exception as e:
+                print(f"Warning: Could not download {name}: {e}")
+                print("Some features may not work properly.")
+
+# Try to download NLTK data
+try:
+    download_nltk_data()
+except Exception as e:
+    print(f"NLTK setup warning: {e}")
+    print("Continuing with basic functionality...")
+
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('averaged_perceptron_tagger')
+nltk.download('maxent_ne_chunker')
+nltk.download('words')
 
 class AdvancedNLPAnalyzer:
     def __init__(self, language='english'):
@@ -51,16 +80,35 @@ class AdvancedNLPAnalyzer:
         Initialize the NLP Analyzer with required components
         """
         self.language = language
-        self.stop_words = set(stopwords.words(language))
-        self.lemmatizer = WordNetLemmatizer()
+        
+        # Basic stopwords fallback if NLTK fails
+        try:
+            self.stop_words = set(stopwords.words(language))
+        except:
+            # Fallback basic English stopwords
+            self.stop_words = {
+                'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours',
+                'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers',
+                'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves',
+                'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are',
+                'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does',
+                'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until',
+                'while', 'of', 'at', 'by', 'for', 'with', 'through', 'during', 'before', 'after',
+                'above', 'below', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again',
+                'further', 'then', 'once'
+            }
+            print("Using fallback stopwords list")
+        
+        try:
+            self.lemmatizer = WordNetLemmatizer()
+        except:
+            self.lemmatizer = None
+            print("Lemmatizer not available, using basic text processing")
+            
         self.sentiment_analyzer = SentimentIntensityAnalyzer()
         
-        # Try to load SpaCy model
-        try:
-            self.nlp = spacy.load("en_core_web_sm")
-        except OSError:
-            print("SpaCy model not found. Install with: python -m spacy download en_core_web_sm")
-            self.nlp = None
+        # SpaCy removed - using NLTK only
+        self.nlp = None
         
         # Initialize storage for analysis results
         self.text_data = None
@@ -106,7 +154,7 @@ class AdvancedNLPAnalyzer:
         if remove_stopwords:
             tokens = [token for token in tokens if token not in self.stop_words]
         
-        if lemmatize:
+        if lemmatize and self.lemmatizer:
             tokens = [self.lemmatizer.lemmatize(token) for token in tokens]
         
         # Remove short words and numbers
@@ -245,9 +293,20 @@ class AdvancedNLPAnalyzer:
         """Helper method to preprocess individual sentences"""
         sentence = sentence.lower()
         sentence = re.sub(r'[^\w\s]', ' ', sentence)
-        tokens = word_tokenize(sentence)
-        tokens = [self.lemmatizer.lemmatize(token) for token in tokens 
-                 if token not in self.stop_words and len(token) > 2 and not token.isdigit()]
+        # Tokenize with fallback
+        try:
+            tokens = word_tokenize(sentence)
+        except:
+            # Simple fallback tokenization
+            tokens = sentence.split()
+        
+        # Lemmatize with fallback
+        if self.lemmatizer:
+            tokens = [self.lemmatizer.lemmatize(token) for token in tokens 
+                     if token not in self.stop_words and len(token) > 2 and not token.isdigit()]
+        else:
+            tokens = [token.lower() for token in tokens 
+                     if token.lower() not in self.stop_words and len(token) > 2 and not token.isdigit()]
         return ' '.join(tokens)
     
     def named_entity_recognition(self):
@@ -266,11 +325,8 @@ class AdvancedNLPAnalyzer:
                 entity = ' '.join([token for token, pos in chunk.leaves()])
                 entities['nltk'].append({'entity': entity, 'label': chunk.label()})
         
-        # SpaCy NER (if available)
-        if self.nlp:
-            doc = self.nlp(self.text_data)
-            for ent in doc.ents:
-                entities['spacy'].append({'entity': ent.text, 'label': ent.label_})
+        # SpaCy NER removed - using NLTK only
+        pass
         
         return entities
     

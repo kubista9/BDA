@@ -1,124 +1,107 @@
-import os
-import glob
-from nlp_analyzer import AdvancedNLPAnalyzer
+import re
+from collections import Counter
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
+from textblob import TextBlob
 
-def main():
-    print("🚀 Starting NLP Analysis...")
-    print("=" * 50)
+class BasicTextAnalyzer:
+    def __init__(self):
+        self.text_data = ""
+        self.words = []
+        self.word_counts = None
     
-    # Initialize the analyzer
-    analyzer = AdvancedNLPAnalyzer()
-    
-    # Check what files are in the data folder
-    data_folder = "data"
-    
-    if not os.path.exists(data_folder):
-        print(f"❌ Data folder '{data_folder}' not found!")
-        print("Please create a 'data' folder and put your text files there.")
-        return
-    
-    # Find all text files in data folder
-    text_files = glob.glob(os.path.join(data_folder, "*.txt"))
-    
-    if not text_files:
-        print(f"❌ No .txt files found in '{data_folder}' folder!")
-        print("Please add .txt files to the data folder.")
-        return
-    
-    print(f"📁 Found {len(text_files)} text file(s):")
-    for file in text_files:
-        print(f"  • {os.path.basename(file)}")
-    
-    # If multiple files, ask user to choose or combine all
-    if len(text_files) == 1:
-        selected_file = text_files[0]
-        print(f"\n📖 Using: {os.path.basename(selected_file)}")
-    else:
-        print(f"\n🤔 Multiple files found. Choose an option:")
-        print("1. Analyze all files combined")
-        print("2. Choose a specific file")
-        
-        choice = input("Enter your choice (1 or 2): ").strip()
-        
-        if choice == "1":
-            # Combine all files
-            combined_text = ""
-            for file_path in text_files:
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        combined_text += f.read() + "\n\n"
-                    print(f"  ✅ Loaded: {os.path.basename(file_path)}")
-                except Exception as e:
-                    print(f"  ❌ Error loading {file_path}: {e}")
-            
-            # Save combined text temporarily
-            selected_file = "combined_text"
-            analyzer.load_text(combined_text)
+    def load_text(self, text_input):
+        """Load text from string or file"""
+        if isinstance(text_input, str):
+            if text_input.endswith('.txt'):
+                with open(text_input, 'r', encoding='utf-8') as file:
+                    self.text_data = file.read()
+            else:
+                self.text_data = text_input
         else:
-            # Let user choose specific file
-            print("\nAvailable files:")
-            for i, file_path in enumerate(text_files, 1):
-                print(f"{i}. {os.path.basename(file_path)}")
-            
-            try:
-                file_choice = int(input("Enter file number: ")) - 1
-                selected_file = text_files[file_choice]
-                print(f"\n📖 Selected: {os.path.basename(selected_file)}")
-            except (ValueError, IndexError):
-                print("❌ Invalid choice. Using first file.")
-                selected_file = text_files[0]
+            raise ValueError("Input must be string or file path")
+        
+        # Basic word tokenization (no NLTK needed)
+        self.words = [word.lower() for word in re.findall(r'\w+', self.text_data)]
+        self.word_counts = Counter(self.words)
     
-    # Load the text if not already loaded (for single file case)
-    if selected_file != "combined_text":
-        try:
-            analyzer.load_text(selected_file)
-            print(f"✅ Successfully loaded: {os.path.basename(selected_file)}")
-        except Exception as e:
-            print(f"❌ Error loading file: {e}")
-            return
+    def basic_stats(self):
+        """Return basic text statistics"""
+        if not self.text_data:
+            return {}
+        
+        return {
+            'total_chars': len(self.text_data),
+            'total_words': len(self.words),
+            'unique_words': len(set(self.words)),
+            'lexical_diversity': len(set(self.words)) / len(self.words) if self.words else 0,
+            'top_words': self.word_counts.most_common(10)
+        }
     
-    print("\n🔄 Processing text...")
+    def sentiment_analysis(self):
+        """Basic sentiment analysis using TextBlob"""
+        blob = TextBlob(self.text_data)
+        return {
+            'polarity': blob.sentiment.polarity,
+            'subjectivity': blob.sentiment.subjectivity,
+            'assessment': "Positive" if blob.sentiment.polarity > 0.1 else 
+                         "Negative" if blob.sentiment.polarity < -0.1 else 
+                         "Neutral"
+        }
     
-    # Run preprocessing
-    analyzer.preprocess_text()
-    print("✅ Text preprocessing completed")
+    def create_wordcloud(self):
+        """Generate and display a word cloud"""
+        wordcloud = WordCloud(width=800, height=400, 
+                             background_color='white').generate(self.text_data)
+        plt.figure(figsize=(10, 5))
+        plt.imshow(wordcloud, interpolation='bilinear')
+        plt.axis('off')
+        plt.show()
     
-    # Perform analyses
-    print("📊 Running basic statistics...")
-    stats = analyzer.basic_statistics()
+    def plot_word_frequency(self, top_n=15):
+        """Plot top words frequency"""
+        top_words = self.word_counts.most_common(top_n)
+        words, counts = zip(*top_words)
+        
+        plt.figure(figsize=(10, 5))
+        plt.barh(words, counts, color='skyblue')
+        plt.title(f'Top {top_n} Most Frequent Words')
+        plt.xlabel('Frequency')
+        plt.tight_layout()
+        plt.show()
+
+def demo():
+    """Demo the basic analyzer"""
+    sample_text = """
+    Artificial intelligence is transforming our world. Machine learning helps computers 
+    learn from data. Many companies use AI for business applications. 
+    The future of AI looks promising but we must consider ethical implications.
+    """
     
-    print("💭 Running sentiment analysis...")
+    print("🚀 Basic Text Analysis Demo")
+    print("=" * 40)
+    
+    analyzer = BasicTextAnalyzer()
+    analyzer.load_text(sample_text)
+    
+    # Show stats
+    stats = analyzer.basic_stats()
+    print("\n📊 Basic Statistics:")
+    print(f"Total characters: {stats['total_chars']}")
+    print(f"Total words: {stats['total_words']}")
+    print(f"Unique words: {stats['unique_words']}")
+    print(f"Top words: {[w[0] for w in stats['top_words']]}")
+    
+    # Show sentiment
     sentiment = analyzer.sentiment_analysis()
+    print("\n😊 Sentiment Analysis:")
+    print(f"Polarity: {sentiment['polarity']:.2f} ({sentiment['assessment']})")
+    print(f"Subjectivity: {sentiment['subjectivity']:.2f}")
     
-    print("🎯 Running topic modeling...")
-    topics = analyzer.topic_modeling(n_topics=5)
-    
-    print("🎨 Generating visualizations...")
-    analyzer.create_visualizations(save_plots=True, output_dir="./results/")
-    
-    print("📝 Generating comprehensive report...")
-    report = analyzer.generate_report("./results/nlp_analysis_report.txt")
-    
-    print("\n" + "=" * 50)
-    print("🎉 Analysis Complete!")
-    print("📁 Results saved in './results/' folder:")
-    print("  • nlp_analysis_dashboard.png - Main visualization dashboard")
-    print("  • interactive_topics.html - Interactive topic analysis")
-    print("  • nlp_analysis_report.txt - Detailed text report")
-    print("\n📈 Quick Summary:")
-    print(f"  • Total words: {stats['total_words']:,}")
-    print(f"  • Total sentences: {stats['total_sentences']:,}")
-    print(f"  • Overall sentiment: {sentiment['overall_vader']['compound']:.3f}")
-    print(f"  • Topics found: {len(topics['topics'])}")
+    # Create visualizations
+    print("\n🖼️ Generating visualizations...")
+    analyzer.create_wordcloud()
+    analyzer.plot_word_frequency()
 
 if __name__ == "__main__":
-    # Create results directory if it doesn't exist
-    os.makedirs("results", exist_ok=True)
-    
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n\n⚠️  Analysis interrupted by user")
-    except Exception as e:
-        print(f"\n❌ An error occurred: {e}")
-        print("Please check your data files and try again.")
+    demo()
