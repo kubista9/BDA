@@ -72,17 +72,12 @@ class BasicTextAnalyzer:
 
 def demo():
     """Demo the basic analyzer"""
-    sample_text = """
-    Artificial intelligence is transforming our world. Machine learning helps computers 
-    learn from data. Many companies use AI for business applications. 
-    The future of AI looks promising but we must consider ethical implications.
-    """
     
     print("🚀 Basic Text Analysis Demo")
     print("=" * 40)
     
     analyzer = BasicTextAnalyzer()
-    analyzer.load_text(sample_text)
+    analyzer.load_text("data/test_corpus.txt")
     
     # Show stats
     stats = analyzer.basic_stats()
